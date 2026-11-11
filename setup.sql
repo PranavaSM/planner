@@ -17,3 +17,6 @@ create policy "Only you can see and change your items" on public.items
   for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Newer Supabase projects don't grant table access automatically.
+grant select, insert, update, delete on public.items to authenticated;

@@ -230,13 +230,13 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
   // ---------- data ops ----------
   async function refresh() {
     const { data, error } = await sb.from("items").select("id,kind,title,date,time,done,created").order("created");
-    if (error) { setStatus("Couldn't load your planner. Showing the last saved copy on this device."); return; }
+    if (error) { setStatus("Couldn't load your planner (" + (error.message || error.code || "unknown error") + ")"); console.error(error); return; }
     items = data; saveCache(); mode = "ready"; setStatus("Synced"); render();
   }
   async function run(op) {
     setStatus("Saving…");
     const { error } = await op;
-    if (error) { setStatus("Couldn't save that change. Check your connection and try again."); refresh(); }
+    if (error) { setStatus("Couldn't save that change (" + (error.message || error.code || "unknown error") + ")"); console.error(error); }
     else setStatus("Synced");
   }
   function addItem(data) {
