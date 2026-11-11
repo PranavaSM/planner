@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column app — header with view tabs, then the active view (day / calendar / to-do). */
+:root {
+  --bg: #f2f4f8; --surface: #ffffff; --sunk: #e9edf3; --ink: #18212f; --muted: #5d697c; --line: #dbe0e8;
+  --accent: #3552d4; --accent-ink: #ffffff;
+  --k-assignment: #2a6bd8; --k-turnin: #b86e00; --k-test: #cc3346; --k-extra: #18905f;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131a; --surface: #171c25; --sunk: #1e2430; --ink: #e5e9f0; --muted: #96a1b4; --line: #2a3241;
+  --accent: #7f96ff; --accent-ink: #0f131a;
+  --k-assignment: #6ea2ff; --k-turnin: #f0a838; --k-test: #ff7584; --k-extra: #4fcf96; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131a; --surface: #171c25; --sunk: #1e2430; --ink: #e5e9f0; --muted: #96a1b4; --line: #2a3241;
+  --accent: #7f96ff; --accent-ink: #0f131a;
+  --k-assignment: #6ea2ff; --k-turnin: #f0a838; --k-test: #ff7584; --k-extra: #4fcf96; color-scheme: dark }
+
+* { box-sizing: border-box; }
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+[hidden] { display: none !important; }
+.login { max-width: 380px; width: 100%; margin: 8vh auto 0; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.login h2 { font-size: 22px; }
+.login .field { width: 100%; }
+.login .err { color: var(--k-test); font-size: 13px; min-height: 1.2em; }
+.signout { border: 0; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; padding: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.82em; }
+.muted { color: var(--muted); }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--muted); }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 26px; }
+#status { font-size: 12px; color: var(--muted); }
+.tabs { display: flex; gap: 4px; background: var(--sunk); padding: 4px; border-radius: 999px; }
+.tabs button { border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 14px; padding: 7px 16px; border-radius: 999px; }
+.tabs button[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-weight: 500; font-size: 14px; }
+.btn:hover { background: var(--sunk); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.iconbtn { border: 0; background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 6px; font-size: 18px; line-height: 1; flex: none; }
+.iconbtn:hover { background: var(--sunk); color: var(--ink); }
+
+/* date nav */
+.datebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.datebar h2 { font-size: clamp(22px, 4vw, 32px); }
+.datebar .sub { color: var(--muted); font-size: 14px; }
+.navgroup { display: flex; gap: 6px; align-items: center; }
+
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.week button .d { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.week button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.week button.today .d { color: var(--accent); }
+.dots { display: flex; gap: 3px; height: 6px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+
+/* add form */
+.addform { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.kinds label { position: relative; }
+.kinds input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.kinds span { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+.kinds span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.kinds input:checked + span { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.kinds input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.addrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.field { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.addrow .title { flex: 1 1 220px; }
+.addrow input[type="time"], .addrow input[type="date"] { flex: 0 0 auto; }
+
+/* day sections */
+.daygrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.section { padding: 14px 14px 10px; border-top: 3px solid var(--c); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.section h3 { font-size: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.section h3 .count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-weight: 500; }
+ul.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+ul.items li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); min-width: 0; }
+ul.items li:first-child { border-top: 0; }
+ul.items input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--c, var(--accent)); flex: none; margin: 0; }
+.itext { flex: 1; min-width: 0; overflow-wrap: break-word; }
+li.done .itext { text-decoration: line-through; color: var(--muted); }
+.empty { color: var(--muted); font-size: 13px; padding: 4px 0 6px; }
+.quickadd { border: 0; background: none; color: var(--muted); font-size: 13px; padding: 4px 0; text-align: left; font-weight: 500; }
+.quickadd:hover { color: var(--c); }
+
+.side { display: flex; flex-direction: column; gap: 12px; }
+.side .panel { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.side h3 { font-size: 15px; }
+.upcoming li { gap: 8px; }
+.tag { font-size: 11px; font-weight: 600; color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); border-radius: 4px; padding: 0 5px; flex: none; }
+.when { flex: none; color: var(--muted); }
+
+/* calendar */
+.cal { overflow: hidden; }
+.calhead, .calgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calhead div { padding: 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.calgrid button { border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); min-height: 108px; padding: 6px; text-align: left; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.calgrid button:nth-child(7n) { border-right: 0; }
+.calgrid button:hover { background: var(--sunk); }
+.calgrid button.out { background: var(--bg); color: var(--muted); }
+.calgrid .num { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.calgrid .today .num { background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 7px; align-self: flex-start; }
+.chip { font-size: 12px; line-height: 1.35; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--c); }
+.chip.done { opacity: 0.55; text-decoration: line-through; }
+.more { font-size: 11px; color: var(--muted); }
+.caldots { display: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* todo */
+.todo { max-width: 680px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.todo .panel { padding: 14px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.todo ul.items li { padding: 9px 0; }
+
+.banner { padding: 14px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-style: dashed; }
+
+@media (max-width: 820px) {
+  .daygrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .sections { grid-template-columns: minmax(0, 1fr); }
+  .calgrid button { min-height: 64px; padding: 4px; }
+  .calgrid .chip, .calgrid .more { display: none; }
+  .caldots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .calhead div { padding: 6px 4px; font-size: 10px; }
+  .week button { padding: 6px 2px; }
+  .week button .d { font-size: 16px; }
+  .tabs button { padding: 7px 12px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .tabs button, .week button { transition: background-color .15s, border-color .15s; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Student Planner</h1>
+      <span id="status">Loading your planner…</span>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button type="button" data-view="day">Day</button>
+      <button type="button" data-view="calendar">Calendar</button>
+      <button type="button" data-view="todo">To-do</button>
+    </nav>
+  </header>
+  <main id="view"></main>
+</div>
+
+<script>
+(function () {
+  const KINDS = {
+    assignment: { label: "Daily assignments", short: "Assignment" },
+    turnin:     { label: "Turn in",           short: "Turn in" },
+    test:       { label: "Tests",             short: "Test" },
+    extra:      { label: "Extracurriculars",  short: "Activity" },
+  };
+  const KIND_ORDER = ["assignment", "turnin", "test", "extra"];
+  const LS_KEY = "student-planner-items-v1";
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  // ---------- dates ----------
+  const pad = n => String(n).padStart(2, "0");
+  const keyOf = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (k, n) => { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
+  const todayKey = () => keyOf(new Date());
+  const daysBetween = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 86400000);
+  const fmtTime = t => { if (!t) return ""; const [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "pm" : "am"; return ((h % 12) || 12) + ":" + pad(m) + ap; };
+  const longDate = k => { const d = parseKey(k); return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }); };
+  const relDay = k => { const n = daysBetween(todayKey(), k); if (n === 0) return "Today"; if (n === 1) return "Tomorrow"; if (n === -1) return "Yesterday"; return n > 0 ? "In " + n + " days" : Math.abs(n) + " days ago"; };
+
+  // ---------- state ----------
+  let items = [];
+  let mode = "pending"; // pending | ready
+  const ui = { view: "day", sel: todayKey(), month: null, kind: "assignment", todoFilter: "active" };
+  { const t = new Date(); ui.month = new Date(t.getFullYear(), t.getMonth(), 1); }
+
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+  // A copy in this browser so the page opens instantly and works briefly offline; the database is the source of truth.
+  const loadCache = () => { try { const v = JSON.parse(localStorage.getItem(LS_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
+  const saveCache = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(items)); } catch {} };
+
+  const statusEl = document.getElementById("status");
+  const setStatus = t => { statusEl.textContent = t; };
+  const FIELDS = ["id", "kind", "title", "date", "time", "done", "created"];
+  const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
+
+  // ---------- data ops (saved to a Google Sheet in your Drive) ----------
+  const server = (fn, ...args) => new Promise((ok, fail) =>
+    google.script.run.withSuccessHandler(ok).withFailureHandler(fail)[fn](...args));
+  let pending = 0;
+  async function refresh() {
+    if (pending) return; // don't overwrite changes that are still saving
+    try {
+      const data = await server("getItems");
+      if (pending) return;
+      items = data; saveCache(); mode = "ready"; setStatus("Synced"); render();
+    } catch (e) { setStatus("Couldn't load your planner (" + ((e && e.message) || e) + ")"); }
+  }
+  async function run(fn, ...args) {
+    pending++; setStatus("Saving…");
+    try { await server(fn, ...args); pending--; if (!pending) setStatus("Synced"); }
+    catch (e) { pending--; setStatus("Couldn't save that change (" + ((e && e.message) || e) + ")"); }
+  }
+  function addItem(data) {
+    const item = Object.assign({ id: uid(), title: "", kind: "todo", date: "", time: "", done: false, created: Date.now() }, data);
+    items.push(item); saveCache(); render();
+    run("addItem", pick(Object.assign({}, item, { id: item.id })));
+  }
+  function updateItem(id, patch) {
+    const it = items.find(i => i.id === id); if (it) Object.assign(it, patch); saveCache(); render();
+    run("updateItem", id, pick(patch));
+  }
+  function removeItem(id) {
+    items = items.filter(i => i.id !== id); saveCache(); render();
+    run("deleteItem", id);
+  }
+  function addSampleWeek() {
+    const t = todayKey();
+    [
+      { kind: "assignment", title: "Math: textbook p. 142, #1–25 odd", date: t },
+      { kind: "assignment", title: "Read History ch. 7 and take notes", date: t },
+      { kind: "turnin", title: "English essay draft", date: t, time: "08:00" },
+      { kind: "extra", title: "Soccer practice", date: t, time: "15:30" },
+      { kind: "assignment", title: "Spanish vocab worksheet", date: addDays(t, 1) },
+      { kind: "test", title: "Biology quiz: cell structure", date: addDays(t, 2), time: "10:15" },
+      { kind: "turnin", title: "Chemistry lab report", date: addDays(t, 3) },
+      { kind: "extra", title: "Robotics club meeting", date: addDays(t, 3), time: "16:00" },
+      { kind: "test", title: "Algebra unit test", date: addDays(t, 6) },
+      { kind: "todo", title: "Buy graph paper" },
+      { kind: "todo", title: "Email coach about Saturday" },
+    ].forEach(addItem);
+  }
+
+  // ---------- tiny DOM helper ----------
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k === "style") el.style.cssText = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+    return el;
+  }
+  const kc = k => "--c: var(--k-" + k + ")";
+  const byTime = (a, b) => (a.time || "99").localeCompare(b.time || "99") || (a.created || 0) - (b.created || 0);
+  const planned = () => items.filter(i => i.kind !== "todo" && i.date);
+
+  function itemRow(it, opts = {}) {
+    const box = h("input", { type: "checkbox", id: "chk-" + it.id, "aria-label": "Mark done: " + it.title });
+    box.checked = !!it.done;
+    box.addEventListener("change", () => updateItem(it.id, { done: box.checked }));
+    return h("li", { class: it.done ? "done" : "", style: kc(it.kind) },
+      box,
+      opts.tag ? h("span", { class: "tag", style: kc(it.kind) }, KINDS[it.kind].short) : null,
+      h("label", { class: "itext", for: "chk-" + it.id }, it.title),
+      opts.when ? h("span", { class: "when mono" }, opts.when) : (it.time ? h("span", { class: "when mono" }, fmtTime(it.time)) : null),
+      h("button", { class: "iconbtn", "aria-label": "Delete " + it.title, title: "Delete", onclick: () => removeItem(it.id) }, "×"));
+  }
+
+  // ---------- views ----------
+  const viewEl = document.getElementById("view");
+
+  function renderDay() {
+    const sel = ui.sel, tk = todayKey();
+    const dayItems = planned().filter(i => i.date === sel);
+
+    // week strip (Sun–Sat containing selected day)
+    const start = addDays(sel, -parseKey(sel).getDay());
+    const week = h("div", { class: "week", role: "group", "aria-label": "Week" });
+    for (let n = 0; n < 7; n++) {
+      const k = addDays(start, n), d = parseKey(k);
+      const kinds = [...new Set(planned().filter(i => i.date === k).map(i => i.kind))];
+      week.append(h("button", { class: k === tk ? "today" : "", "aria-pressed": String(k === sel), onclick: () => { ui.sel = k; render(); } },
+        h("span", { class: "label" }, DOW[d.getDay()]),
+        h("span", { class: "d" }, d.getDate()),
+        h("span", { class: "dots" }, KIND_ORDER.filter(x => kinds.includes(x)).map(x => h("span", { class: "dot", style: kc(x) })))));
+    }
+
+    // add form
+    const title = h("input", { class: "field title", id: "add-title", placeholder: "What's due or happening?", "aria-label": "Title", autocomplete: "off" });
+    const time = h("input", { class: "field", id: "add-time", type: "time", "aria-label": "Time (optional)" });
+    const kinds = h("div", { class: "kinds", role: "radiogroup", "aria-label": "Type" },
+      KIND_ORDER.map(k => {
+        const r = h("input", { type: "radio", name: "kind", id: "kind-" + k, value: k });
+        r.checked = ui.kind === k;
+        r.addEventListener("change", () => { ui.kind = k; });
+        return h("label", { style: kc(k) }, r, h("span", null, KINDS[k].short));
+      }));
+    const form = h("form", { class: "panel addform", onsubmit: e => {
+      e.preventDefault();
+      const t = title.value.trim(); if (!t) { title.focus(); return; }
+      addItem({ kind: ui.kind, title: t, date: sel, time: time.value });
+      title.value = ""; time.value = ""; setTimeout(() => document.getElementById("add-title")?.focus(), 0);
+    } },
+      h("span", { class: "label" }, "Add to " + (sel === tk ? "today" : longDate(sel))),
+      kinds,
+      h("div", { class: "addrow" }, title, time, h("button", { class: "btn primary", type: "submit" }, "Add")));
+
+    // sections
+    const sections = h("div", { class: "sections" }, KIND_ORDER.map(k => {
+      const list = dayItems.filter(i => i.kind === k).sort(byTime);
+      return h("section", { class: "panel section", style: kc(k) },
+        h("h3", null, KINDS[k].label, h("span", { class: "count" }, list.filter(i => i.done).length + "/" + list.length)),
+        list.length ? h("ul", { class: "items" }, list.map(it => itemRow(it))) : h("div", { class: "empty" }, "Nothing here yet."),
+        h("button", { class: "quickadd", type: "button", onclick: () => {
+          ui.kind = k; const r = document.getElementById("kind-" + k); if (r) r.checked = true;
+          document.getElementById("add-title")?.focus();
+        } }, "+ Add " + KINDS[k].short.toLowerCase()));
+    }));
+
+    // upcoming tests & turn-ins (next 14 days from today)
+    const up = planned().filter(i => (i.kind === "test" || i.kind === "turnin") && !i.done && i.date >= tk && i.date <= addDays(tk, 14))
+      .sort((a, b) => a.date.localeCompare(b.date) || byTime(a, b)).slice(0, 8);
+    const overdue = planned().filter(i => i.kind === "turnin" && !i.done && i.date < tk);
+    const openTodos = items.filter(i => i.kind === "todo" && !i.done);
+
+    const side = h("aside", { class: "side" },
+      h("div", { class: "panel" },
+        h("h3", null, "Coming up"),
+        h("span", { class: "muted", style: "font-size:13px" }, "Tests and turn-ins, next 2 weeks"),
+        up.length ? h("ul", { class: "items upcoming" }, up.map(it => itemRow(it, { tag: true, when: relDay(it.date) }))) : h("div", { class: "empty" }, "No tests or turn-ins coming up.")),
+      overdue.length ? h("div", { class: "panel" },
+        h("h3", null, "Late turn-ins"),
+        h("ul", { class: "items" }, overdue.map(it => itemRow(it, { when: relDay(it.date) })))) : null,
+      h("div", { class: "panel" },
+        h("h3", null, "To-do"),
+        openTodos.length ? h("ul", { class: "items" }, openTodos.slice(0, 5).map(it => itemRow(it))) : h("div", { class: "empty" }, "All clear."),
+        h("button", { type: "button", class: "quickadd", onclick: () => { ui.view = "todo"; render(); window.scrollTo(0, 0); } }, openTodos.length > 5 ? "See all " + openTodos.length + " →" : "Open to-do list →")));
+
+    const head = h("div", { class: "datebar" },
+      h("div", null, h("h2", null, longDate(sel)), h("div", { class: "sub" }, relDay(sel))),
+      h("div", { class: "navgroup" },
+        h("button", { class: "btn", "aria-label": "Previous day", onclick: () => { ui.sel = addDays(sel, -1); render(); } }, "←"),
+        h("button", { class: "btn", onclick: () => { ui.sel = tk; render(); } }, "Today"),
+        h("button", { class: "btn", "aria-label": "Next day", onclick: () => { ui.sel = addDays(sel, 1); render(); } }, "→"),
+        h("input", { class: "field", type: "date", id: "jump-date", value: sel, "aria-label": "Jump to date", onchange: e => { if (e.target.value) { ui.sel = e.target.value; render(); } } })));
+
+    return h("div", { style: "display:flex;flex-direction:column;gap:16px" },
+      emptyBanner(), head, week,
+      h("div", { class: "daygrid" }, h("div", { style: "display:flex;flex-direction:column;gap:12px;min-width:0" }, form, sections), side));
+  }
+
+  function renderCalendar() {
+    const m = ui.month, tk = todayKey();
+    const first = keyOf(m);
+    const gridStart = addDays(first, -m.getDay());
+    const byDate = {};
+    planned().forEach(i => { (byDate[i.date] = byDate[i.date] || []).push(i); });
+    const weeks = Math.ceil((m.getDay() + new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate()) / 7);
+
+    const grid = h("div", { class: "calgrid" });
+    for (let n = 0; n < weeks * 7; n++) {
+      const k = addDays(gridStart, n), d = parseKey(k);
+      const list = (byDate[k] || []).sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || byTime(a, b));
+      const label = longDate(k) + (list.length ? ", " + list.length + " item" + (list.length > 1 ? "s" : "") : "");
+      grid.append(h("button", { class: (d.getMonth() !== m.getMonth() ? "out " : "") + (k === tk ? "today" : ""), "aria-label": label,
+        onclick: () => { ui.sel = k; ui.view = "day"; render(); window.scrollTo(0, 0); } },
+        h("span", { class: "num" }, d.getDate()),
+        list.slice(0, 3).map(i => h("span", { class: "chip" + (i.done ? " done" : ""), style: kc(i.kind) }, i.title)),
+        list.length > 3 ? h("span", { class: "more" }, "+" + (list.length - 3) + " more") : null,
+        h("span", { class: "caldots" }, list.slice(0, 6).map(i => h("span", { class: "dot", style: kc(i.kind) })))));
+    }
+    const shift = n => { ui.month = new Date(m.getFullYear(), m.getMonth() + n, 1); render(); };
+    return h("div", { style: "display:flex;flex-direction:column;gap:16px" },
+      emptyBanner(),
+      h("div", { class: "datebar" },
+        h("h2", null, MONTHS[m.getMonth()] + " " + m.getFullYear()),
+        h("div", { class: "navgroup" },
+          h("button", { class: "btn", "aria-label": "Previous month", onclick: () => shift(-1) }, "←"),
+          h("button", { class: "btn", onclick: () => { const t = new Date(); ui.month = new Date(t.getFullYear(), t.getMonth(), 1); render(); } }, "This month"),
+          h("button", { class: "btn", "aria-label": "Next month", onclick: () => shift(1) }, "→"))),
+      h("div", { class: "panel cal" },
+        h("div", { class: "calhead" }, DOW.map(d => h("div", { class: "label" }, d))), grid),
+      h("div", { class: "legend" }, KIND_ORDER.map(k => h("span", null, h("span", { class: "dot", style: kc(k) }), KINDS[k].label)),
+        h("span", null, "Tap a day to open it in the planner.")));
+  }
+
+  function renderTodo() {
+    const todos = items.filter(i => i.kind === "todo");
+    const shown = todos.filter(i => ui.todoFilter === "all" || (ui.todoFilter === "done" ? i.done : !i.done))
+      .sort((a, b) => (a.done - b.done) || (a.date || "9999").localeCompare(b.date || "9999") || (a.created || 0) - (b.created || 0));
+    const title = h("input", { class: "field title", id: "todo-title", placeholder: "Add a task", "aria-label": "Task", autocomplete: "off" });
+    const due = h("input", { class: "field", id: "todo-due", type: "date", "aria-label": "Due date (optional)" });
+    const form = h("form", { class: "panel addform", onsubmit: e => {
+      e.preventDefault(); const t = title.value.trim(); if (!t) { title.focus(); return; }
+      addItem({ kind: "todo", title: t, date: due.value });
+      title.value = ""; due.value = ""; setTimeout(() => document.getElementById("todo-title")?.focus(), 0);
+    } },
+      h("span", { class: "label" }, "New task"),
+      h("div", { class: "addrow" }, title, due, h("button", { class: "btn primary", type: "submit" }, "Add")));
+    const counts = { active: todos.filter(i => !i.done).length, done: todos.filter(i => i.done).length, all: todos.length };
+    const filters = h("div", { class: "filters", role: "group", "aria-label": "Show" },
+      [["active", "To do"], ["done", "Done"], ["all", "All"]].map(([k, l]) =>
+        h("button", { class: "btn", "aria-pressed": String(ui.todoFilter === k), onclick: () => { ui.todoFilter = k; render(); } }, l + " · " + counts[k])));
+    const tk = todayKey();
+    const list = shown.length
+      ? h("ul", { class: "items" }, shown.map(it => itemRow(it, { when: it.date ? (it.date < tk && !it.done ? "Late · " : "") + relDay(it.date) : null })))
+      : h("div", { class: "empty" }, ui.todoFilter === "done" ? "Nothing checked off yet." : "No tasks. Add one above.");
+    const clear = counts.done ? h("button", { class: "quickadd", onclick: () => todos.filter(i => i.done).forEach(i => removeItem(i.id)) }, "Clear " + counts.done + " done") : null;
+    return h("div", { class: "todo" },
+      emptyBanner(),
+      h("div", { class: "datebar" }, h("h2", null, "To-do list"), filters),
+      form,
+      h("div", { class: "panel" }, list, clear));
+  }
+
+  function emptyBanner() {
+    if (items.length || mode === "pending") return null;
+    return h("div", { class: "panel banner" },
+      h("div", null, h("strong", null, "Your planner is empty."), " ",
+        h("span", { class: "muted" }, "Add your first assignment below, or load an example week to see how it works. You can delete the examples any time.")),
+      h("button", { class: "btn", onclick: addSampleWeek }, "Load example week"));
+  }
+
+  function render() {
+    const v = ui.view;
+    document.querySelectorAll(".tabs button").forEach(a => { if (a.dataset.view === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    const active = document.activeElement && document.activeElement.id;
+    viewEl.replaceChildren(v === "calendar" ? renderCalendar() : v === "todo" ? renderTodo() : renderDay());
+    if (active && active.startsWith("chk-")) document.getElementById(active)?.focus();
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { ui.view = b.dataset.view; render(); }));
+
+  // ---------- startup ----------
+  items = loadCache(); mode = items.length ? "ready" : "pending";
+  render(); refresh();
+  // Pick up changes made on your other computers when you come back to this tab.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+})();
+</script>
+</body>
+</html>
