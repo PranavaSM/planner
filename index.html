@@ -164,7 +164,7 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
 <div class="wrap">
   <form id="login" class="panel login" hidden>
     <h2>Sign in to your planner</h2>
-    <input class="field" id="login-email" type="email" placeholder="Email" autocomplete="username" required>
+    <input class="field" id="login-email" type="email" placeholder="Email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required>
     <input class="field" id="login-pass" type="password" placeholder="Password" autocomplete="current-password" required>
     <button class="btn primary" type="submit">Sign in</button>
     <div class="err" id="login-err" role="alert"></div>
@@ -485,7 +485,7 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
     const { error } = await sb.auth.signInWithPassword({
       email: document.getElementById("login-email").value.trim(),
       password: document.getElementById("login-pass").value });
-    err.textContent = error ? "That email and password didn't match. Try again." : "";
+    err.textContent = !error ? "" : /invalid login credentials/i.test(error.message || "") ? "That email and password didn't match. Try again." : "Couldn't sign in (" + (error.message || error.code || "unknown error") + ")";
   });
   document.getElementById("signout").addEventListener("click", async () => {
     try { localStorage.removeItem(LS_KEY); } catch {}
