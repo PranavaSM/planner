@@ -1,7 +1,13 @@
-// Your Supabase project's details (Project Settings → API).
-// The "anon public" key is safe to publish: your data is protected by the sign-in
-// and the row-level security rules in setup.sql.
+// Your Firebase web app settings (Firebase console → Project settings → Your apps → Web app → SDK setup and configuration → Config).
+// These values are meant to be public: your data is protected by your sign-in
+// and the security rules in firestore.rules.
 window.PLANNER_CONFIG = {
-  SUPABASE_URL: "https://cfaafaacjkkjesjgvsyf.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_2HM8Ap-zAoKmL_LCAyRS6A_FgMaobhD",
+  firebase: {
+    apiKey: "YOUR-API-KEY",
+    authDomain: "YOUR-PROJECT.firebaseapp.com",
+    projectId: "YOUR-PROJECT",
+    storageBucket: "YOUR-PROJECT.appspot.com",
+    messagingSenderId: "YOUR-SENDER-ID",
+    appId: "YOUR-APP-ID",
+  },
 };

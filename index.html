@@ -184,7 +184,9 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
   <main id="view" hidden></main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
 <script>
 (function () {
@@ -213,7 +215,7 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
   // ---------- state ----------
   let items = [];
   let mode = "pending"; // pending | ready
-  let sb = null;
+  let col = null, unsub = null;
   const ui = { view: "day", sel: todayKey(), month: null, kind: "assignment", todoFilter: "active" };
   { const t = new Date(); ui.month = new Date(t.getFullYear(), t.getMonth(), 1); }
 
@@ -227,30 +229,17 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
   const FIELDS = ["kind", "title", "date", "time", "done", "created"];
   const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
 
-  // ---------- data ops ----------
-  async function refresh() {
-    const { data, error } = await sb.from("items").select("id,kind,title,date,time,done,created").order("created");
-    if (error) { setStatus("Couldn't load your planner (" + (error.message || error.code || "unknown error") + ")"); console.error(error); return; }
-    items = data; saveCache(); mode = "ready"; setStatus("Synced"); render();
-  }
-  async function run(op) {
-    setStatus("Saving…");
-    const { error } = await op;
-    if (error) { setStatus("Couldn't save that change (" + (error.message || error.code || "unknown error") + ")"); console.error(error); }
-    else setStatus("Synced");
-  }
+  // ---------- data ops (Firebase Firestore: users/<your id>/items) ----------
+  const fail = what => e => setStatus("Couldn't " + what + " (" + ((e && (e.message || e.code)) || "unknown error") + ")");
   function addItem(data) {
-    const item = Object.assign({ id: uid(), title: "", kind: "todo", date: "", time: "", done: false, created: Date.now() }, data);
-    items.push(item); saveCache(); render();
-    run(sb.from("items").insert(Object.assign({ id: item.id }, pick(item))));
+    const item = Object.assign({ title: "", kind: "todo", date: "", time: "", done: false, created: Date.now() }, data);
+    col.doc(uid()).set(pick(item)).catch(fail("save that change"));
   }
   function updateItem(id, patch) {
-    const it = items.find(i => i.id === id); if (it) Object.assign(it, patch); saveCache(); render();
-    run(sb.from("items").update(pick(patch)).eq("id", id));
+    col.doc(id).update(pick(patch)).catch(fail("save that change"));
   }
   function removeItem(id) {
-    items = items.filter(i => i.id !== id); saveCache(); render();
-    run(sb.from("items").delete().eq("id", id));
+    col.doc(id).delete().catch(fail("delete that"));
   }
   function addSampleWeek() {
     const t = todayKey();
@@ -470,42 +459,47 @@ li.done .itext { text-decoration: line-through; color: var(--muted); }
     document.getElementById("app-top").hidden = !on;
     viewEl.hidden = !on;
   };
-  const cfg = window.PLANNER_CONFIG || {};
-  if (!window.supabase || !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("YOUR-")) {
+  const cfg = (window.PLANNER_CONFIG || {}).firebase || {};
+  if (!window.firebase || !cfg.apiKey || cfg.apiKey.includes("YOUR-")) {
     loginEl.hidden = false;
     loginEl.replaceChildren(h("h2", null, "Almost ready"),
-      h("p", { class: "muted" }, "Add your Supabase project URL and key to config.js, then reload this page."));
+      h("p", { class: "muted" }, window.firebase ? "Add your Firebase settings to config.js, then reload this page." : "Couldn't load Firebase. Check your internet connection and reload."));
     return;
   }
-  sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  firebase.initializeApp(cfg);
+  const auth = firebase.auth();
+  const fs = firebase.firestore();
+  try { fs.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch {}
 
   loginEl.addEventListener("submit", async e => {
     e.preventDefault();
     const err = document.getElementById("login-err"); err.textContent = "Signing in…";
-    const { error } = await sb.auth.signInWithPassword({
-      email: document.getElementById("login-email").value.trim(),
-      password: document.getElementById("login-pass").value });
-    err.textContent = !error ? "" : /invalid login credentials/i.test(error.message || "") ? "That email and password didn't match. Try again." : "Couldn't sign in (" + (error.message || error.code || "unknown error") + ")";
-  });
-  document.getElementById("signout").addEventListener("click", async () => {
-    try { localStorage.removeItem(LS_KEY); } catch {}
-    await sb.auth.signOut();
-  });
-
-  let signedIn = false;
-  sb.auth.onAuthStateChange((_event, session) => {
-    const now = !!session;
-    if (now === signedIn && (now || !loginEl.hidden)) return;
-    signedIn = now;
-    if (now) {
-      items = loadCache(); mode = items.length ? "ready" : "pending";
-      showApp(true); render(); setTimeout(refresh, 0);
-    } else {
-      items = []; mode = "pending"; showApp(false);
+    try {
+      await auth.signInWithEmailAndPassword(document.getElementById("login-email").value.trim(), document.getElementById("login-pass").value);
+      err.textContent = "";
+    } catch (x) {
+      const c = (x && x.code) || "";
+      err.textContent = /invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/.test(c)
+        ? "That email and password didn't match. Try again."
+        : /too-many-requests/.test(c) ? "Too many tries. Wait a few minutes and try again."
+        : "Couldn't sign in (" + (x.message || c || "unknown error") + ")";
     }
   });
-  // Pick up changes made on your other devices when you come back to this tab.
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && signedIn) refresh(); });
+  document.getElementById("signout").addEventListener("click", () => auth.signOut());
+
+  auth.onAuthStateChanged(user => {
+    if (unsub) { unsub(); unsub = null; }
+    if (!user) { items = []; mode = "pending"; col = null; showApp(false); return; }
+    col = fs.collection("users").doc(user.uid).collection("items");
+    items = []; mode = "pending"; setStatus("Loading your planner…"); showApp(true); render();
+    const timer = setTimeout(() => setStatus("Can't reach your planner yet. Check your connection."), 10000);
+    unsub = col.onSnapshot({ includeMetadataChanges: true }, snap => {
+      items = snap.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+      if (!snap.metadata.fromCache) { clearTimeout(timer); mode = "ready"; }
+      setStatus(snap.metadata.hasPendingWrites ? "Saving…" : snap.metadata.fromCache ? "Offline: changes will sync when you reconnect" : "Synced");
+      render();
+    }, e => { clearTimeout(timer); fail("load your planner")(e); });
+  });
 })();
 </script>
 </body>
